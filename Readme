@@ -1,0 +1,101 @@
+NASA Anomaly detection - Dockerized ML Project
+
+Overview
+This project implements anomaly detection on NASA turbofan engine degradation simulation data using Isolation Forest algorithm. This algorithm was chosen as it is good for high dimenional data without the assumption of normal distribution and is unsupervised The pipeline is containerized with Docker.
+
+The model is trained with data and the plots to show anomalies prediction results on test and train data written into CSV output files are saved inside the container. 
+
+Project Structure
+CMAPSS_ML/
+|----CMAPSS_IsolationForest.py
+|----DataReadme.txt
+|----Dockerfile 
+|----README
+|----requirements.txt
+|----test_FD001.txt
+|----train_FD001.txt
+|----ouptut/
+    |----TestAnomalyResults
+    |----TrainAnomalyResults
+    |----plot/
+
+* Dockerfile
+    Defines the container environment using python:3.9-slim as the base image.
+        The Dockerfile has comments included for every execution
+
+* requirements.txt list all dependencies in PyPI version only
+
+* train_FD001.txt   
+    Holds the training data
+
+* test_FD001.txt
+    Hold the test data
+
+* DataReadme
+    Information on training and test data
+
+*ouptut
+    *TestAnomalyResults
+        Anomalies predicted in test data
+    *TrainAnomalyResults
+        Anomalies predicted in train data
+    *plots/
+        Plots with anomalies and correct data points
+
+* CMAPSS_IsolationForest.py
+    ML script to train the model and classify the data points
+
+
+PROJECT WORKFLOW
+* Needs the folder 
+    CMAPSS_ML/
+        |----CMAPSS_IsolationForest.py
+        |----DataReadme.txt
+        |----Dockerfile 
+        |----README
+        |----requirements.txt
+        |----test_FD001.txt
+        |----train_FD001.txt
+
+* Prepare environment
+    WSL environment enabled
+    Docker is installed and running
+
+*Steps to follow
+    1. Copy folder to own system
+    2. Open terminal in teh project folder
+    3. Build Docker image
+        * Docker Image Build
+            cd ~/DockerPractice/CMAPSS_ML
+            docker build -t nasa-anomaly . # Docker reads the Dockerfile. Creates working directory inside the container, copies the requirements first, installs the dependencies and then copies rest of the files from host to container. Sequence written in the Dockerfile
+            mkdir output
+            docker run -rm -v $(pwd)/output: /app/output nasa-anomaly  #--rm Removes container after exit
+                #-v use volume mounts to get outputs on host 
+                # $(pwd)/output:/app/output  maps host folder to container folder
+            docker ps -a # verify container execution
+
+WORKFLOW
+
+    Host Folder (~/DockerPractice/CMAPSS_ML)
+|---- train/
+|----test/
+|---- CMAPSS_IsolationForest.py
+|---- output/  <-- mapped to container
+
+         │  docker build
+         ▼
+
+Container /app
+|---- train/   (copied from host)
+|---- test/    (copied from host)
+|---- CMAPSS_IsolationForest.py
+|---- output/  <-- writes CSV here
+
+         │  docker run with volume
+         ▼
+
+Host Folder ~/DockerPractice/CMAPSS_ML/output/
+|---- TrainAnomalyResults.csv
+|---- TestAnomalyResults.csv
+
+    
