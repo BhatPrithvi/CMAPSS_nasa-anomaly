@@ -1,9 +1,11 @@
 __pycache__/ 
 *.pyc
 Thumbs.db
+output/
 
 
 
 # When running a python script, Python compiles it into bytecode(.pyc) for faster future runs. These files get stored in __pycache__/. They aremachine gerated and not part of source code
-#.pyc ignores all python compiled files
-#Thumbs.db - created by Windows and stored thumbnail cache for images/videos in a folder 
+# .pyc ignores all python compiled files
+# Thumbs.db - created by Windows and stored thumbnail cache for images/videos in a folder 
+# Ignore output folder

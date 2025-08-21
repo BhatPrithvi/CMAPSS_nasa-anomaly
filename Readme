@@ -5,8 +5,10 @@ This project implements anomaly detection on NASA turbofan engine degradation si
 
 The model is trained with data and the plots to show anomalies prediction results on test and train data written into CSV output files are saved inside the container. 
 
+
+
 Project Structure
-CMAPSS_ML/
+nasa-anomaly/
 |----CMAPSS_IsolationForest.py
 |----DataReadme.txt
 |----Dockerfile 
@@ -47,8 +49,9 @@ CMAPSS_ML/
 
 
 PROJECT WORKFLOW
+
 * Needs the folder 
-    CMAPSS_ML/
+    nasa-anomaly/
         |----CMAPSS_IsolationForest.py
         |----DataReadme.txt
         |----Dockerfile 
@@ -63,12 +66,12 @@ PROJECT WORKFLOW
 
 *Steps to follow
     1. Copy folder to own system
-    2. Open terminal in teh project folder
+    2. Open terminal in the project folder
+        cd ~/DockerPractice/nasa-anomaly
     3. Build Docker image
-        * Docker Image Build
-            cd ~/DockerPractice/CMAPSS_ML
+        * Docker Image Build            
             docker build -t nasa-anomaly . # Docker reads the Dockerfile. Creates working directory inside the container, copies the requirements first, installs the dependencies and then copies rest of the files from host to container. Sequence written in the Dockerfile
-            mkdir output
+            mkdir output # create output to store logs and results
             docker run -rm -v $(pwd)/output: /app/output nasa-anomaly  #--rm Removes container after exit
                 #-v use volume mounts to get outputs on host 
                 # $(pwd)/output:/app/output  maps host folder to container folder
