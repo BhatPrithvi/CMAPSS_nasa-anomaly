@@ -18,6 +18,12 @@ COPY . .
 
 # Create output folder inside container to save logs and results
 RUN mkdir -p output
+RUN mkdir -p output/plots
+
+# Exposes port 8000 for Prometheus metrics
+EXPOSE 8000
 
 # Default command to run ML script in JSON format. This runs the ML script
-CMD ["python", "CMAPSS_IsolationForest.py"]
+CMD ["python","-u", "CMAPSS_IsolationForest.py"]
+
+

@@ -1,11 +1,16 @@
 NASA Anomaly detection - Dockerized ML Project
 
 Overview
-This project implements anomaly detection on NASA turbofan engine degradation simulation data using Isolation Forest algorithm. This algorithm was chosen as it is good for high dimenional data without the assumption of normal distribution and is unsupervised The pipeline is containerized with Docker.
+This project implements anomaly detection on NASA turbofan engine degradation simulation data using Isolation Forest algorithm. This algorithm was chosen as it is good for high dimensional data without the assumption of normal distribution and is unsupervised The pipeline is containerized with Docker.
 
 The model is trained with data and the plots to show anomalies prediction results on test and train data written into CSV output files are saved inside the container. 
 
-
+Main Features
+    Anomaly detection with Isolation forest
+    Prometheus metrics : Anomaly count, CPU, Memory percentage
+    Grafana dashboards : real time anomaly visualization
+    Dockerize setup with multiple containers
+    Logging module to log anomalies
 
 Project Structure
 nasa-anomaly/
@@ -16,10 +21,9 @@ nasa-anomaly/
 |----requirements.txt
 |----test_FD001.txt
 |----train_FD001.txt
-|----ouptut/
-    |----TestAnomalyResults
-    |----TrainAnomalyResults
-    |----plot/
+|----docker-compose yml
+|----prometheus.yml
+|----grafana/
 
 * Dockerfile
     Defines the container environment using python:3.9-slim as the base image.
@@ -36,7 +40,25 @@ nasa-anomaly/
 * DataReadme
     Information on training and test data
 
-*ouptut
+* CMAPSS_IsolationForest.py
+    ML script to train the model and classify the data points
+
+* docker-compose.yml
+    Sets up a multi-container environment with all services networked
+
+* prometheus.yml
+    Configuration for prometheus
+
+
+Folder structure generated after runtime 
+|----output/
+    |----TestAnomalyResults
+    |----TrainAnomalyResults
+    |----plot/
+        |----anomaly_plot*.png
+    |----Anomaly.log 
+
+*output
     *TestAnomalyResults
         Anomalies predicted in test data
     *TrainAnomalyResults
@@ -44,61 +66,61 @@ nasa-anomaly/
     *plots/
         Plots with anomalies and correct data points
 
-* CMAPSS_IsolationForest.py
-    ML script to train the model and classify the data points
-
 
 PROJECT WORKFLOW
+*   # In the terminal, inside the folder, Clones the repository
+    git clone http://github.com/BhatPrithvi/nasa-anomaly.git     
+    cd nasa-anomaly
 
-* Needs the folder 
-    nasa-anomaly/
-        |----CMAPSS_IsolationForest.py
-        |----DataReadme.txt
-        |----Dockerfile 
-        |----README
-        |----requirements.txt
-        |----test_FD001.txt
-        |----train_FD001.txt
+    docker-compose up --build 
+    # Runs the file docker-compose .This will start three services
+    #    * ML container (nasa-ml)
+    #           Runs python script, exposes Prometheus metrics on port 8000
+    #           http://localhost:8000  -> raw metrics text
+    #    * Prometheus container
+    #           Scraps(reads) metrics from nasa-ml:8000/metrics
+    #           http://localhost:9090  -> Prometheus UI (Targets, Graph, etc.)
+    #    * Grafana container
+    #           Grafana dashboards query Prometheus which has data scraped from Prometheus container and visualizes data on dashboard
+    #           http://localhost:3000  -> Grafana UI( default : admin/admin)
 
-* Prepare environment
-    WSL environment enabled
-    Docker is installed and running
+*   Grafana configuration
+    1. Open Grafana --> Add Data Source --> choose Prometheus
+    2. Set URL : http://prometheus:9090
+    3. Create a dashboard
 
-*Steps to follow
-    1. Copy folder to own system
-    2. Open terminal in the project folder
-        cd ~/DockerPractice/nasa-anomaly
-    3. Build Docker image
-        * Docker Image Build            
-            docker build -t nasa-anomaly . # Docker reads the Dockerfile. Creates working directory inside the container, copies the requirements first, installs the dependencies and then copies rest of the files from host to container. Sequence written in the Dockerfile
-            mkdir output # create output to store logs and results
-            docker run -rm -v $(pwd)/output: /app/output nasa-anomaly  #--rm Removes container after exit
-                #-v use volume mounts to get outputs on host 
-                # $(pwd)/output:/app/output  maps host folder to container folder
-            docker ps -a # verify container execution
+* ML Script overview
+    * Isolation forest used to detect anomalies
+    * Log files generated
+    * Exposes Prometheus gauges  
 
-WORKFLOW
+*   Logs, Output and Monitoring
+    * All plots and predictions logged to the output/ folder
+    * Prometheus scraps metrics every 5 seconds
+    * Grafana dashboards visualize metrics in real time
 
-    Host Folder (~/DockerPractice/CMAPSS_ML)
-|---- train/
-|----test/
-|---- CMAPSS_IsolationForest.py
-|---- output/  <-- mapped to container
 
-         │  docker build
-         ▼
+# Grafana Dashboard
 
-Container /app
-|---- train/   (copied from host)
-|---- test/    (copied from host)
-|---- CMAPSS_IsolationForest.py
-|---- output/  <-- writes CSV here
+The project includes a pre-configured Grafana dashboard in the folder grafana/dashboard.json for visualization
 
-         │  docker run with volume
-         ▼
+# Steps :
 
-Host Folder ~/DockerPractice/CMAPSS_ML/output/
-|---- TrainAnomalyResults.csv
-|---- TestAnomalyResults.csv
+1. Open Grafana at [http://localhost:3000] and log in (default: admin/admin)
+2. Click the **“+” → Import** button
+3. Either:
+   - Upload the JSON file: `grafana/dashboard.json` (included in this repo), or
+   - Copy-paste the JSON content into the import textbox
+4. Select the Prometheus datasource (default: `Prometheus`) and click **Import**
+5. The dashboard will display:
+   - Metrics defined in ML container
+*   Snapshot of Grafana dashboard
+
+![alt text](GrafanaDashboard.png)
+
+
+
+
+
 
     
