@@ -1,11 +1,31 @@
-NASA Anomaly detection - Dockerized ML Project
+NASA Anomaly detection 
 
 Overview
-This project implements anomaly detection on NASA turbofan engine degradation simulation data using Isolation Forest algorithm. This algorithm was chosen as it is good for high dimenional data without the assumption of normal distribution and is unsupervised The pipeline is containerized with Docker.
+This project demonstrates how a machine learning  anomaly detection script can be containerized with Docker, deployed with Kubernetes, and accessed via a Flask API in the browser. 
 
-The model is trained with data and the plots to show anomalies prediction results on test and train data written into CSV output files are saved inside the container. 
+1. ML Script
+Runs anomaly detection on NASA turbofan engine degradation simulation data using Isolation Forest algorithm. This algorithm was chosen as it is good for high dimensional data without the assumption of normal distribution and is unsupervised. 
+The results are saved inside /app/output.
+The Flask API is started on port 8000 and exposes results via the http endpoint.
+
+2. Docker builds a container image based on dockerfile with Python + dependencies as listed in requirements.txt and runs the ML script inside the container.
+
+3. Kubernetes : Minikube (local Kubernetes cluster in a VM / local simulator of the Kubernetes system) provides a single node Kubernetes cluster.
+
+4. Flask API
 
 
+************************************************************
+Components : 
+    * Pod - wraps around the container
+    * Deployment - Ensures pod runs and controls replicas, resource requests and container definition
+    * Node - A worker machine. Minikube creates one node. Runs kubelet(*sadfcdf?) + container runtime (*fdfsdfsd?)
+    * Persistent volume (PV) - provides storage
+    * Persistent Volume Claim (PVC) - Requests storage from PV
+    * Service - Exposes pod to the outside world. Pods get dynamic IPs. Service provides stable way to reach pods.  In this case Flask app is exposed at a fixed port in the Minikube node. It bridges the app running in the pod to the external world.
+
+    Kubernetes Overview (Found below **)
+**********************************************************
 
 Project Structure
 nasa-anomaly/
@@ -16,10 +36,15 @@ nasa-anomaly/
 |----requirements.txt
 |----test_FD001.txt
 |----train_FD001.txt
-|----ouptut/
-    |----TestAnomalyResults
-    |----TrainAnomalyResults
-    |----plot/
+|----k8s/
+    |----kind/
+    |----manifests/
+        |----deployment.yaml
+        |----pv.yaml
+        |----pvc.yaml
+        |----service.yaml
+    |----minikube/
+        |----deploy_minikube.sh
 
 * Dockerfile
     Defines the container environment using python:3.9-slim as the base image.
@@ -48,57 +73,56 @@ nasa-anomaly/
     ML script to train the model and classify the data points
 
 
-PROJECT WORKFLOW
 
-* Needs the folder 
-    nasa-anomaly/
-        |----CMAPSS_IsolationForest.py
-        |----DataReadme.txt
-        |----Dockerfile 
-        |----README
-        |----requirements.txt
-        |----test_FD001.txt
-        |----train_FD001.txt
-
-* Prepare environment
-    WSL environment enabled
-    Docker is installed and running
-
-*Steps to follow
-    1. Copy folder to own system
-    2. Open terminal in the project folder
-        cd ~/DockerPractice/nasa-anomaly
-    3. Build Docker image
-        * Docker Image Build            
-            docker build -t nasa-anomaly . # Docker reads the Dockerfile. Creates working directory inside the container, copies the requirements first, installs the dependencies and then copies rest of the files from host to container. Sequence written in the Dockerfile
-            mkdir output # create output to store logs and results
-            docker run -rm -v $(pwd)/output: /app/output nasa-anomaly  #--rm Removes container after exit
-                #-v use volume mounts to get outputs on host 
-                # $(pwd)/output:/app/output  maps host folder to container folder
-            docker ps -a # verify container execution
-
-WORKFLOW
-
-    Host Folder (~/DockerPractice/CMAPSS_ML)
-|---- train/
-|----test/
-|---- CMAPSS_IsolationForest.py
-|---- output/  <-- mapped to container
-
-         │  docker build
-         ▼
-
-Container /app
-|---- train/   (copied from host)
-|---- test/    (copied from host)
-|---- CMAPSS_IsolationForest.py
-|---- output/  <-- writes CSV here
-
-         │  docker run with volume
-         ▼
-
-Host Folder ~/DockerPractice/CMAPSS_ML/output/
-|---- TrainAnomalyResults.csv
-|---- TestAnomalyResults.csv
 
     
+
+Kubernetes workflow
++--------------------------+
+|   ML Script (Flask) |
+|      port 8000      |
++------------+-------------+
+             |
+             v
++--------------------------+
+|      Docker Container    |
+|  Built via Dockerfile    |
++------------+-------------+
+             |
+             v
++--------------------------+
+|         Pod              |
+| (smallest unit in K8s)   |
++------------+-------------+
+             |
+             v
++--------------------------+
+|      Node (Minikube VM)  |            
++------------+-------------+
+             |
+             v
++--------------------------+
+|       Kubernetes Service |
+| Type: NodePort           |
+| Example: 30080 -> 8000   |
++------------+-------------+
+             |
+             v
++--------------------------+      +------------------+
+|  Minikube Cluster IP     | ---> |   Host Browser   |
+|  (minikube ip)           |      | http://IP:30080 |     #dclusgdlgc verify
++--------------------------+      +------------------+
+
+Volume Flow
+ML Script (/app/output)  
+      ↓
+Container VolumeMount (/app/output)  
+      ↓
+Pod Volume (PVC claimName: ml-output-pvc)  
+      ↓
+Persistent Volume (PV → hostPath: /mnt/data/ml-output)  
+      ↓
+Mounted via Minikube (--mount-string="${PWD}/output:/mnt/data/ml-output")  
+      ↓
+Host Folder (./output)
+

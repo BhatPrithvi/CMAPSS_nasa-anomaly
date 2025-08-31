@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cmapss-isolationforest
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: cmapss-isolationforest
+  template:
+    metadata:
+      labels:
+        app: cmapss-isolationforest
+    spec:
+      containers:
+        - name: nasa-anomaly-container
+          image: nasa-anomaly:latest       # local testing
+          # image: prithvibhat/nasa-anomaly:latest  # for GitHub
+          imagePullPolicy: IfNotPresent # Use the local image if it’s there; don’t try to pull from a registry
+          ports:
+            - containerPort: 8000
+          volumeMounts:
+            - mountPath: /app/output     # Inside container
+              name: ml-output-storage
+      volumes:
+        - name: ml-output-storage
+          persistentVolumeClaim:
+            claimName: ml-output-pvc
+

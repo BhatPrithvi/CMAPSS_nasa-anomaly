@@ -49,3 +49,22 @@ TrainAnomaly.to_csv('/app/output/TrainAnomalyResults.csv')
 TestAnomaly.to_csv('/app/output/TestAnomalyResults.csv')
 
 print("Anomaly Detection complete")
+
+from flask import Flask, jsonify
+
+app = Flask(__name__)
+
+@app.route("/")
+def hello():
+    return "Hello from CMAPSS Isolation Forest"
+
+@app.route("/metrics")
+def metrics():
+    # Optional: return some basic stats
+    return jsonify({
+        "CPU": psutil.cpu_percent(),
+        "Memory": psutil.virtual_memory().percent
+    })
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=8000)
