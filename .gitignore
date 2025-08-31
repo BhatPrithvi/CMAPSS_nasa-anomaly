@@ -2,7 +2,7 @@ __pycache__/
 *.pyc
 Thumbs.db
 output/
-
+ml-output/
 
 
 # When running a python script, Python compiles it into bytecode(.pyc) for faster future runs. These files get stored in __pycache__/. They aremachine gerated and not part of source code
