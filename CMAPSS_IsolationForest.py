@@ -52,12 +52,14 @@ print("Anomaly Detection complete")
 
 from flask import Flask, jsonify
 
-app = Flask(__name__)
+app = Flask(__name__) # Initializes a Flask application. This is the entry point for the web service.
 
-@app.route("/")
+# Defines the root endpoint (/) which responds with a simple text message. Conforms service is running
+@app.route("/") 
 def hello():
     return "Hello from CMAPSS Isolation Forest"
 
+# Defines an endpoint that returns basic system statistics (CPU, memory usage) in JSON. This makes the service observable and easy to integrate with monitoring tools (like Prometheus).
 @app.route("/metrics")
 def metrics():
     # Optional: return some basic stats
@@ -66,5 +68,8 @@ def metrics():
         "Memory": psutil.virtual_memory().percent
     })
 
+# Runs the Flask app on all available network interfaces inside the container (0.0.0.0) and binds it to port 8000. This ensures the service is accessible externally when Docker/Kubernetes expose it.
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000)
+
+

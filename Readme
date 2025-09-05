@@ -1,6 +1,6 @@
 NASA Anomaly detection 
 
-Overview
+# Overview
 This project demonstrates how a machine learning  anomaly detection script can be containerized with Docker, deployed with Kubernetes, and accessed via a Flask API in the browser. 
 
 1. ML Script
@@ -12,27 +12,15 @@ The Flask API is started on port 8000 and exposes results via the http endpoint.
 
 3. Kubernetes : Minikube (local Kubernetes cluster in a VM / local simulator of the Kubernetes system) provides a single node Kubernetes cluster.
 
-4. Flask API
+4. Flask API : The anomaly detection ML script is exposed through a Flask API, making it accessible via HTTP endpoints.
 
 
-************************************************************
-Components : 
-    * Pod - wraps around the container
-    * Deployment - Ensures pod runs and controls replicas, resource requests and container definition
-    * Node - A worker machine. Minikube creates one node. Runs kubelet(*sadfcdf?) + container runtime (*fdfsdfsd?)
-    * Persistent volume (PV) - provides storage
-    * Persistent Volume Claim (PVC) - Requests storage from PV
-    * Service - Exposes pod to the outside world. Pods get dynamic IPs. Service provides stable way to reach pods.  In this case Flask app is exposed at a fixed port in the Minikube node. It bridges the app running in the pod to the external world.
-
-    Kubernetes Overview (Found below **)
-**********************************************************
-
-Project Structure
+# Project Structure
 nasa-anomaly/
 |----CMAPSS_IsolationForest.py
 |----DataReadme.txt
 |----Dockerfile 
-|----README
+|----Readme
 |----requirements.txt
 |----test_FD001.txt
 |----train_FD001.txt
@@ -45,73 +33,151 @@ nasa-anomaly/
         |----service.yaml
     |----minikube/
         |----deploy_minikube.sh
+        |----stop_minikube.sh
 
+
+* CMAPSS_IsolationForest.py
+    ML script to train the model and classify the data points
+* DataReadme
+    Information on training and test data
 * Dockerfile
-    Defines the container environment using python:3.9-slim as the base image.
-        The Dockerfile has comments included for every execution
-
+    Defines the container environment using python:3.9-slim as the base image
+* Readme
 * requirements.txt list all dependencies in PyPI version only
-
+* test_FD001.txt
+    Hold the test data
 * train_FD001.txt   
     Holds the training data
 
-* test_FD001.txt
-    Hold the test data
+## Manifests for Kubernetes
+* deployment.yaml
+* pv.yaml
+    Defines the storage resource
+* pvc.yaml
+    Request storage using a persistent volume claim
+* service.yaml
 
-* DataReadme
-    Information on training and test data
+## Deployment via Minikube
+* deploy_minikube.sh
+    helper script for minikube
+* stop_minikube.sh
 
-*ouptut
+
+
+
+# Folder structure generated after runtime 
+|----output/
+    |----TestAnomalyResults
+    |----TrainAnomalyResults
+    |----plot/
+        |----anomaly_plot*.png
+
+*output
     *TestAnomalyResults
         Anomalies predicted in test data
     *TrainAnomalyResults
         Anomalies predicted in train data
     *plots/
         Plots with anomalies and correct data points
-
-* CMAPSS_IsolationForest.py
-    ML script to train the model and classify the data points
-
-
-
-
     
+# Requisites on local host
+    Clone the repository
+    Run Docker desktop
+    Deploy Kubernetes cluster inside the repository
 
-Kubernetes workflow
-+--------------------------+
-|   ML Script (Flask) |
-|      port 8000      |
-+------------+-------------+
-             |
-             v
-+--------------------------+
-|      Docker Container    |
-|  Built via Dockerfile    |
-+------------+-------------+
-             |
-             v
-+--------------------------+
-|         Pod              |
-| (smallest unit in K8s)   |
-+------------+-------------+
-             |
-             v
-+--------------------------+
-|      Node (Minikube VM)  |            
-+------------+-------------+
-             |
-             v
-+--------------------------+
-|       Kubernetes Service |
-| Type: NodePort           |
-| Example: 30080 -> 8000   |
-+------------+-------------+
-             |
-             v
-+--------------------------+      +------------------+
-|  Minikube Cluster IP     | ---> |   Host Browser   |
-|  (minikube ip)           |      | http://IP:30080 |     #dclusgdlgc verify
-+--------------------------+      +------------------+
+# Deploying on Minikube
+The project can be run manually step by step or by running a helper script
+
+## With helper script
+    chmod +x k8s/minikube/deploy_minikube.sh     # Changes file permission to make it executable
+    ./k8s/minikube/deploy_minikube.sh            # Run the script 
+
+    * Stop Minikube
+    chmod +x k8s/minikube/stop_minikube.sh       # Changes file permission to make it executable
+    ./k8s/minikube/stop_minikube.sh              # Delete the minikube cluster
+
+## Manual execution
+
+    minikube start                            # start MiniKube
+
+    eval $(minikube docker-env)               # Point Docker CLI to Minikube’s Docker daemon
+
+    docker build -t nasa-anomaly:latest .     # Build the image inside Minikube
+
+    kubectl apply -f k8s/manifests/           # Apply Kubernetes manifests (PV, PVC, Deployment, Service)
+
+    kubectl delete pod -l app=nasa-anomaly    # Restart pods to pick up the new image
+
+    kubectl get pods                          # Check pod status
+
+    minikube service cmapss-isolationforest   # Access the service (opens browser)
+
+
+
+    delete Minikube                           # Delete minikube cluster
+
+
+
+************************************************************
+# Kubernetes 
+
+## Component overview : 
+    * Pod - wraps around the container. smallest deployable unit
+    * Deployment - Ensures pod runs and controls replicas, resource requests and container definition
+    * Node - A worker machine. Minikube creates one node. Minikube provides one VM/Node that acts as both the Master (control plane) and the Worker (data plane).
+    * Persistent volume (PV) - provides storage
+    * Persistent Volume Claim (PVC) - Requests storage from PV
+    * Service - Exposes pod to the outside world. Pods get dynamic IPs. Service provides stable way to reach pods.  In this case Flask app is exposed at a fixed port in the Minikube node. It bridges the app running in the pod to the external world.
+
+A. Cluster Architecture
+    1. Master node :
+    The Master Node is the control plane of the cluster. It manages the desired state of the cluster, schedules workloads, monitors node health, and exposes APIs for administrative actions.
+    Key Components:
+        API Server (kube-apiserver) : Central entry point for all Kubernetes commands. Exposes a REST API. Receives kubectl commands (e.g., kubectl apply -f deployment.yaml) and stores the desired state in etcd. 
+
+        etcd : A consistent, high-availability key-value store. Maintains the complete state of the cluster (Pods, Services, PVCs, ConfigMaps, Secrets).
+
+        Scheduler (kube-scheduler):Watches for Pods without assigned nodes. Determines which node should run a Pod based on resource availability, node labels, affinities, and taints. In a single-node Minikube setup, all Pods are assigned to that one node.
+
+        Controller Manager (kube-controller-manager): Runs controllers that enforce the desired state:
+            ReplicationController/ReplicaSet -> ensures correct number of Pod replicas
+            Node Controller -> monitors node health
+            PV/PVC Controller -> binds PersistentVolumeClaims to PersistentVolumes
+            Deployment Controller -> ensures deployment rules are enforced 
+            Cloud Controller Manager -> (optional, in cloud setups), Integrates Kubernetes with underlying cloud provider resources (not relevant for Minikube).
+
+    Role in Deployment: The Master Node decides where ML Pod will run, manages replicas, and ensures that PVCs are correctly bound to PVs.It does not execute ML code directly, but orchestrates the container runtime that does. 
+
+    2. Worker Node :
+    The actual workloads run like ML containers, databases, or microservices run in the worker node. Each Worker Node runs:
+        Kubelet ->	Node agent that watches the API server for Pod specifications. Responsible for:
+            Starting/stopping containers (via Docker in Minikube)
+            Mounting volumes (PVC → PV → container)
+            Reporting Pod and container status back to the API server
+
+        Container Runtime (Docker in Minikube) -> Executes containers as instructed by the Kubelet. Handles image pulls, container startup, networking, and storage mounts.
+
+        Kube-Proxy -> Manages networking rules on the node to allow Services to route traffic to the correct Pods. Ensures NodePort or ClusterIP traffic reaches the container.
+
+    Role in Deployment: Kubelet starts the ML container using Docker. Mounts /app/output to the Persistent Volume (PVC → PV → hostPath).Exposes the Flask API through the Kubernetes Service.
+
+B. Orchestration Flow
+
+User / DevOps Action -> 
+                        kubectl apply -f k8s/manifests/
+
+API Server on the Master Node stores the desired state in etcd. 
+Scheduler determines which Worker Node will run the Pod. In Minikube (single node), all Pods are scheduled to that node.
+Controller Manager ensures the correct number of replicas are running and binds PVCs to PVs for persistent storage.
+Kubelet on Worker Node receives PodSpec from API server, launches container via Docker,mounts volumes and sets up networking.
+Kube-Proxy routes NodePort traffic from the host to the container port (e.g., Flask port 8000).
+The Kubernetes Service acts as a gateway between the host and Pod. Services + NodePort allow external traffic to reach the ML Flask API.
+
+Traffic flows: Host → NodePort → Kube-Proxy → Pod → Container → Flask API. 
+
+Persistent Storage : 
+Pod writes outputs to /app/output (inside the container).
+Mounted via PVC → PV → hostPath → visible on host machine.
 
 Volume Flow
 ML Script (/app/output)  
@@ -125,4 +191,108 @@ Persistent Volume (PV → hostPath: /mnt/data/ml-output)
 Mounted via Minikube (--mount-string="${PWD}/output:/mnt/data/ml-output")  
       ↓
 Host Folder (./output)
+
+C. Summary
+Master Node	Orchestrates the cluster, maintains desired state, schedules Pods, manages controllers,schedules ML Pods, binds PVCs, monitors replicas
+Worker Node	Runs workloads, executes containers via Kubelet & Docker, handles networking,runs ML container, mounts output volume, exposes Flask API
+
+
+# Flask API in the ML Pipeline
+
+ Flask is a lightweight Python framework that allows defining REST-style routes (e.g., /, /metrics) which return predictions, system metrics, or logs.
+
+The ML script and Flask API run in the same container. The Python file executes anomaly detection and then starts the Flask server on port 8000. Flask’s routing system exposes results to external clients. For example, /metrics returns CPU and memory stats, while other routes can expose ML inference results.
+Its minimal design keeps the container lightweight.
+Service exposes Flask to the outside world. Pod IPs are ephemeral, so the Service maps Flask’s port 8000 to a stable NodePort (e.g., 30080).
+
+End-to-End Flow
+
+Request can be sent via
+ curl http://<minikube-ip>:30080/metrics   (Metrics not yet implemented)
+
+The request hits the Kubernetes Service, which forwards it through kube-proxy to the correct Pod.The Pod runs Flask, which executes the ML function and returns the result as JSON/text. Response travels back through the same path → Service → Node → User.
+
+
+# Debugging & Troubleshooting
+
+This section summarizes the most useful commands and common errors needed to inspect logs, check Pods, or fix cluster issues.  
+
+---
+
+##  Minikube Debugging
+
+| Command | Purpose |
+|---------|---------|
+| `minikube status` | Check if Minikube host, kubelet, and API server are running. |
+| `minikube logs` | View cluster-wide logs (VM/container logs). |
+| `minikube ssh` | Log in to the Minikube VM/container for low-level debugging. |
+| `minikube ip` | Get the cluster IP address (used with NodePort services). |
+| `minikube service <service-name>` | Opens the service endpoint in your browser automatically. |
+| `minikube dashboard` | Launch the Kubernetes web dashboard for interactive debugging. |
+| `minikube delete` | Delete the current cluster (use when things are broken beyond repair). |
+
+---
+
+## Kubectl Debugging    
+
+### Pods & Containers
+
+| Command | Purpose |
+|---------|---------|
+| `kubectl get pods -n <namespace>` | List Pods in a namespace. |
+| `kubectl get pods -n <namespace> -w` | Watch Pods start up in real time. |
+| `kubectl describe pod <pod-name> -n <namespace>` | Detailed info (events, volumes, reasons for errors). |
+| `kubectl logs <pod-name> -n <namespace>` | Fetch logs from a Pod (default container). |
+| `kubectl logs <pod-name> -c <container-name> -n <namespace>` | Fetch logs from a specific container in a Pod. |
+| `kubectl exec -it <pod-name> -n <namespace> -- /bin/bash` | Exec into a running container for live debugging. |
+| `kubectl delete pod <pod-name> -n <namespace>` | Delete a Pod (Deployment/ReplicaSet will restart it). |
+
+### Deployments & Services
+
+| Command | Purpose |
+|---------|---------|
+| `kubectl get deployments -n <namespace>` | Check Deployment rollout status. |
+| `kubectl rollout status deployment/<deployment-name> -n <namespace>` | Watch Deployment rollout progress. |
+| `kubectl describe deployment <deployment-name> -n <namespace>` | Detailed info about Deployment strategy & events. |
+| `kubectl get svc -n <namespace>` | List Services (see ClusterIP / NodePort / LoadBalancer). |
+| `kubectl port-forward svc/<service-name> <local-port>:<target-port> -n <namespace>` | Manually forward Service traffic to localhost. | 
+
+### Storage
+
+| Command | Purpose |
+|---------|---------|
+| `kubectl get pv` | Check Persistent Volumes. |
+| `kubectl get pvc -n <namespace>` | Check Persistent Volume Claims. |
+| `kubectl describe pvc <pvc-name> -n <namespace>` | See if PVC is bound to a PV. |
+
+---
+
+## Common Errors & Quick Fixes
+
+| Error | Likely Cause | Fix |
+|-------|--------------|-----|
+| `ErrImagePull` / `ImagePullBackOff` | Image not found in registry or not built in Minikube’s Docker env. | Run `eval $(minikube docker-env)` then `docker build ...` inside Minikube’s Docker. Check the image to be built if local or from docker hub|
+| `CrashLoopBackOff` | Container repeatedly fails (bad entrypoint, missing dependency). | `kubectl logs <pod>` to check cause. |
+| `permission denied` for file function | Host folder permissions mismatch | Check and alter file permission |
+| `minikube start` fails | Corrupted Minikube container. | `minikube delete && minikube start`. |
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
