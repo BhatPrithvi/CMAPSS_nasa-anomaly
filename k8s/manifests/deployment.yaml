@@ -15,7 +15,6 @@ spec:
       containers:
         - name: nasa-anomaly-container
           image: nasa-anomaly:latest       # local testing
-          # image: prithvibhat/nasa-anomaly:latest  # for GitHub
           imagePullPolicy: IfNotPresent # Use the local image if it’s there; don’t try to pull from a registry
           ports:
             - containerPort: 8000

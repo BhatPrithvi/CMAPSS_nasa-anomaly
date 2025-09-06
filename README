@@ -1,0 +1,183 @@
+# NASA Anomaly Detection – Kubernetes Deployment with Kind
+
+This repository demonstrates the deployment of a **machine learning-based anomaly detection system** using **Flask** and **Kubernetes**, with options to run on **Minikube** or **Kind**.
+
+While Minikube is a local single-node cluster, this README focuses on **Kind (Kubernetes in Docker)**, which is suitable for CI/CD pipelines, testing multi-node clusters, and development without needing a VM.
+
+For detailed explanations of **Kubernetes concepts**, **Flask API**, and **Minikube deployment**, refer to the README in the `k8s/minikube/` folder.
+
+---
+
+## 1. Overview
+
+* **ML Script**: Performs anomaly detection using the NASA CMAPSS dataset and saves results in `/app/output`.
+* **Flask API**: Exposes endpoints:
+
+  * `/` -> Health or simple message
+  * `/metrics` -> CPU and memory stats
+  * `/results` -> Summary of anomaly detection
+* **Kubernetes**: Manages container deployment with:
+
+  * **Pod** -> runs ML + Flask container
+  * **Deployment** -> manages replicas, restart policy
+  * **Service** -> exposes Flask API to host
+  * **PVC / PV** -> mounts container output to host
+
+---
+
+## 2. Getting Started with Kind
+
+### 2.1 Prerequisites
+
+* Docker installed and running
+* Kind installed (`kind` CLI)
+* kubectl installed and configured
+
+### 2.2 Deploying with Kind
+
+1. Run deployment script:
+
+   ```bash
+   chmod +x k8s/kind/deploy_kind.sh
+   ./k8s/kind/deploy_kind.sh
+   ```
+
+   This script will:
+
+   * Create a Kind cluster (if not exists)
+   * Load the Docker image into the cluster
+   * Create namespace `nasa-anomaly`
+   * Apply Deployment, Service, and PVC manifests
+   * Wait for pods to be ready
+   * Port-forward the Flask API to `localhost:8000`
+   * Optionally copy ML output from Pod to host
+
+2. Access Flask API:
+
+   ```text
+   http://localhost:8000/
+   http://localhost:8000/metrics
+   http://localhost:8000/results
+   ```
+3. Stopping cluster
+
+    ```bash
+    chmod +x k8s/kind/stop_kind.sh
+   ./k8s/kind/stop_kind.sh
+   ```
+
+---
+
+## 3. Switching to Minikube
+
+To use Minikube instead:
+
+```bash
+chmod +x k8s/kind/deploy_minikube.sh
+./k8s/minikube/deploy_minikube.sh
+
+
+chmod +x k8s/kind/stop_minikube.sh
+./k8s/minikube/stop_minikube.sh
+```
+
+> Refer to `k8s/minikube/README.md` for full instructions and explanations of Kubernetes concepts with Minikube.
+
+---
+
+## 4. Minikube vs Kind
+
+| Feature / Aspect              | **Minikube**                                                                                            | **Kind**                                                                                                                | Notes / Implications                                                                                                                      |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| **Cluster Type**              | Runs a single-node Kubernetes cluster inside a VM (VirtualBox, HyperKit, Docker, etc.)                  | Runs Kubernetes inside Docker containers on the host                                                                    | Minikube provides a VM-based environment, while Kind is container-based; this affects networking, image handling, and resource isolation. |
+| **Local Image Usage**         | Can use local Docker images if shell points to Minikube’s Docker daemon (`eval $(minikube docker-env)`) | Cannot directly use host Docker images; must load via `kind load docker-image <image>`                                  | Kind nodes are isolated Docker containers; images must be explicitly loaded.                                                              |
+| **Networking**                | VM-based, with minikube-provided IP; port-forwarding less strict                                        | Docker container network; port-forwarding maps host ports into containerized nodes                                      | Minikube may be more forgiving with container startup and ML scripts; Kind requires the container to stay alive for readiness checks.     |
+| **Pod Lifecycle / Readiness** | Slightly more forgiving for containers that exit or block; ML scripts outside Flask may work            | Strict: container must stay alive and pass readiness/liveness checks; top-level blocking or exiting containers may fail | ML scripts should run inside Flask or another long-running process when using Kind.                                                       |
+| **Performance / Resources**   | VM-based; can allocate memory and CPUs to VM                                                            | Uses host Docker resources; lightweight but shares host Docker limits                                                   | Kind is faster to start, no VM overhead; Minikube can be slower due to VM boot time.                                                      |
+| **Multi-Node Support**        | Can simulate multi-node clusters, but mostly single-node for local dev                                  | Can create multi-node clusters by specifying multiple Docker containers                                                 | Kind excels at testing multi-node scenarios locally without VMs.                                                                          |
+| **Port Forwarding**           | `minikube service <service-name>` opens service in browser automatically                                | Use `kubectl port-forward` or NodePort; no automatic browser launch                                                     | Port mapping differs; Minikube has helper commands to simplify access.                                                                    |
+| **Persistence / Volumes**     | Supports hostPath and VM-mounted storage; PVCs work normally                                            | Supports PVCs; uses Docker volumes for persistent storage                                                               | Functionality similar, but underlying storage is different.                                                                               |
+| **Setup / Learning Curve**    | Simple to get started, especially for beginners                                                         | Lightweight, faster, good for CI pipelines                                                                              | Kind is ideal for CI/CD pipelines, automated tests, and GitHub Actions.                                                                   |
+| **Use Case Recommendations**  | Local development, learning Kubernetes, quick ML API testing                                            | CI/CD pipelines, automated testing, multi-node cluster simulation                                                       | Minikube is more “user-friendly” for step-by-step exploration; Kind is more scriptable and CI-friendly.                                   |
+
+
+#### ML Script Must Be Inside Flask for Kind
+
+ML Script Outside Flask (Top-Level Execution):
+
+Container runs ML code immediately at startup. In Minikube, the VM networking allows ML to complete without failing pod readiness. 
+In Kind, which runs pods inside Docker network on the host:
+Top-level ML may finish too quickly -> container exits before Kubernetes marks it ready.
+Top-level ML may block -> Kubernetes health checks fail.
+Result: Pod may crash, restart, or never become ready.
+
+ML Script Encapsulated in Flask:
+
+ML logic wrapped inside a function, invoked by Flask at container startup.
+Flask’s WSGI server keeps the container running indefinitely.
+Kubernetes sees container as healthy → Service / NodePort works → endpoints accessible from host.
+
+
+> In this repo, **Kind is the recommended option** for a quick, reproducible, and GitHub-friendly deployment.
+
+---
+
+## 5. Common Errors & Debugging
+
+| Symptom               | Possible Cause                               | Debug Command / Fix                                                         |
+| --------------------- | -------------------------------------------- | --------------------------------------------------------------------------- |
+| `CrashLoopBackOff`    | Script error inside container or wrong image | `kubectl logs <pod-name> -n nasa-anomaly`                                   |
+| `ErrImagePull`        | Image not loaded into Kind                   | `kind load docker-image nasa-anomaly:latest --name nasa-anomaly`            |
+| `Port not accessible` | Port-forward not running                     | `kubectl port-forward svc/cmapss-isolationforest 8000:8000 -n nasa-anomaly` |
+| Namespace not deleted | Pods stuck in Terminating                    | `kubectl delete pod <pod-name> --grace-period=0 --force`                    |
+| Cannot copy output    | Folder permission or pod not ready           | `kubectl cp <pod>:/app/output ./output`                                     |
+
+---
+
+## 6. Basic Kind & kubectl Commands
+
+```bash
+# List Kind clusters
+kind get clusters
+
+# Delete Kind cluster
+kind delete cluster --name nasa-anomaly
+
+# Check pods
+kubectl get pods -n nasa-anomaly
+
+# Check services
+kubectl get svc -n nasa-anomaly
+
+# Get pod logs
+kubectl logs <pod-name> -n nasa-anomaly
+
+# Port forward
+kubectl port-forward svc/cmapss-isolationforest 8000:8000 -n nasa-anomaly
+
+# Describe resource
+kubectl describe pod <pod-name> -n nasa-anomaly
+
+# Copy files from pod to host
+kubectl cp <namespace>/<pod>:/app/output ./output
+```
+
+---
+
+## 7. Notes
+
+* The ML script runs **once at container startup**, and Flask serves the results via API.
+* With Kind, **local Docker images** are preferred over pulling from Docker Hub.
+* For multi-node or CI/CD simulations, Kind supports multiple nodes.
+* For deeper understanding of **Flask API endpoints, volume mounts, and Kubernetes internals**, see `minikube/README.md`.
+
+
+### Contribution:
+Refactored ML code to run inside Flask for long-running container. 
+Designed container to persist outputs, expose endpoints, and run in Kubernetes.
+Created scripts for automated deployment (deploy_kind.sh, stop_kind.sh) and orchestration.
+Template Use:
+Kubernetes YAML templates (Deployment, Service, PVC) were adapted for this project.
+Helper scripts handle cluster setup and image loading.
+Focus is on demonstrating Kubernetes orchestration of an ML API with Kind as primary deployment target.
+

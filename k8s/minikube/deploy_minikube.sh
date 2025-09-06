@@ -3,7 +3,7 @@ set -e
 
 # --- Configuration ---
 NAMESPACE="nasa-anomaly"
-OUTPUT_DIR=$(pwd)/ml-output
+OUTPUT_DIR=$(pwd)/output
 IMAGE_NAME="nasa-anomaly:latest"
 APP_LABEL="cmapss-isolationforest"
 CONTAINER_PORT=8000
@@ -38,6 +38,7 @@ kubectl delete pods -n $NAMESPACE --all
 
 # --- Step 7: Wait for pods ---
 echo "[INFO] Waiting for pods to be ready..."
+kubectl wait --for=condition=Ready pods --all -n $NAMESPACE --timeout=180s
 kubectl get pods -n $NAMESPACE -w &
 
 # --- Step 8: Get first pod name dynamically ---
