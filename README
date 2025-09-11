@@ -1,6 +1,6 @@
 # NASA Anomaly Detection – Kubernetes Deployment with Kind
 
-This repository demonstrates the deployment of a **machine learning-based anomaly detection system** using **Flask** and **Kubernetes**, with options to run on **Minikube** or **Kind**.
+This repository demonstrates the deployment of a **anomaly detection system** using **Flask** and **Kubernetes**, with options to run on **Minikube** or **Kind**.
 
 While Minikube is a local single-node cluster, this README focuses on **Kind (Kubernetes in Docker)**, which is suitable for CI/CD pipelines, testing multi-node clusters, and development without needing a VM.
 
@@ -16,6 +16,7 @@ For detailed explanations of **Kubernetes concepts**, **Flask API**, and **Minik
   * `/` -> Health or simple message
   * `/metrics` -> CPU and memory stats
   * `/results` -> Summary of anomaly detection
+  
 * **Kubernetes**: Manages container deployment with:
 
   * **Pod** -> runs ML + Flask container

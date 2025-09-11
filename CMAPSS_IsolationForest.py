@@ -56,7 +56,7 @@ def train_model():
     TrainAnomaly.to_csv('/app/output/TrainAnomalyResults.csv')
     TestAnomaly.to_csv('/app/output/TestAnomalyResults.csv')
 
-    print("✅ Anomaly Detection complete")
+    print("Anomaly Detection complete")
     return model, TrainAnomaly, TestAnomaly
 
 

@@ -8,4 +8,4 @@ spec:
   accessModes:
     - ReadWriteOnce
   hostPath:
-    path: /mnt/data/ml-output   # Path inside Minikube VM
+    path: /mnt/data/ml-output   # Path inside Minikube VM or Kind node
