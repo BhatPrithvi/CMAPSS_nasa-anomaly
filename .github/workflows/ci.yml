@@ -1,0 +1,34 @@
+name : CI Pipeline (Docker)
+
+on :
+  push : 
+    branches : feature_ci_cd_github_actions
+  pull :
+    branches : feature_ci_cd_github_actions
+
+jobs :
+  Docker:
+    runs-on : ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout
+
+    - name : Set up python
+      uses : actions/setup-python
+      with:
+        python-version : '3.9'
+
+    - name : Install dependencies
+      run: |
+        python3 -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name : Test Holder
+      run : echo "No tests yet"
+
+    - name : Build Docker image
+      run: docker build -t nasa-anomaly:latest.
+
+
+        
