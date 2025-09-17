@@ -2,9 +2,11 @@ name : CI Pipeline (Docker)
 
 on :
   push : 
-    branches : feature_ci_cd_github_actions
+    branches : 
+      - feature_ci_cd_github_actions
   pull_request :
-    branches : feature_ci_cd_github_actions
+    branches : 
+      - feature_ci_cd_github_actions
 
 jobs :
   Docker:
@@ -12,10 +14,10 @@ jobs :
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout
+      uses: actions/checkout@v3
 
     - name : Set up python
-      uses : actions/setup-python
+      uses : actions/setup-python@v4
       with:
         python-version : '3.9'
 
@@ -28,7 +30,7 @@ jobs :
       run : echo "No tests yet"
 
     - name : Build Docker image
-      run: docker build -t nasa-anomaly:latest.
+      run: docker build -t nasa-anomaly:latest .
 
 
         
