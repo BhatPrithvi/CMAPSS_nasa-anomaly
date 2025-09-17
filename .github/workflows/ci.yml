@@ -3,7 +3,7 @@ name : CI Pipeline (Docker)
 on :
   push : 
     branches : feature_ci_cd_github_actions
-  pull :
+  pull_request :
     branches : feature_ci_cd_github_actions
 
 jobs :
