@@ -44,7 +44,7 @@ jobs :
         sudo mv kubectl /usr/local/bin/
 
     - name : create Kind cluster
-      run : kind create cluster --name nasa-anomaly-cluster
+      run : kind create cluster --name nasa-anomaly
       #run : |
       #  if ! kind get clusters | grep -q "nasa-anomaly"; then
       #  kind create cluster --name nasa-anomaly
