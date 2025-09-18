@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: cmapss-isolationforest
+spec:
+  type: ClusterIP
+  selector:
+    app: cmapss-isolationforest # must be same as in deployment template
+  ports:
+    - protocol: TCP
+      port: 8000        # internal cluster port the service exposes
+      targetPort: 8000  # matches container Port in Deployment. Container port inside the pod
