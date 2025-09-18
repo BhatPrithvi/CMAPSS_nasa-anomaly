@@ -29,10 +29,6 @@ jobs :
     - name : Test Holder
       run : echo "No tests yet"
 
-    - name : Build Docker image
-      run: docker build -t nasa-anomaly:latest .
-
-
     - name : Install Kind
       run : |
         curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64
@@ -40,20 +36,32 @@ jobs :
         sudo mv ./kind /usr/local/bin/kind
         
     - name : Install kubectl
-      run : |
-        curl -Lo "https://di.k8s.io/release/$(curl -L -s https://dl.ks.io/release/stable.txt)/bin/linux/amd64/kubectl"
+      shell: bash -l {0}
+      run: |
+        KUBE_VERSION=$(curl -L -s https://dl.k8s.io/release/stable.txt)
+        curl -Lo kubectl "https://dl.k8s.io/release/${KUBE_VERSION}/bin/linux/amd64/kubectl"
         chmod +x kubectl
-        sudo mv kubectl /use/local/bin/
+        sudo mv kubectl /usr/local/bin/
 
     - name : create Kind cluster
-      run : kind create cluster --name nasa-anomaly
+      run : kind create cluster --name nasa-anomaly-cluster
+      #run : |
+      #  if ! kind get clusters | grep -q "nasa-anomaly"; then
+      #  kind create cluster --name nasa-anomaly
+      #  else
+      #  echo "Cluster nasa-anomaly already exists. Skipping creation."
+      #  fi   # For local testing using 'act'
+    
+
+    - name : Build Docker image
+      run: docker build -t nasa-anomaly:latest .
 
     - name : Load Docker image into Kind
-      run : kind load docker-image nasa-anomaly:latest .
+      run : kind load docker-image nasa-anomaly:latest --name nasa-anomaly
 
     - name : Deploy Flask app
       run : |
-        kubectl apply -f k8s/deployment.yaml
+        kubectl apply -f k8s/manifests/deployment.yaml
         kubectl rollout status deployment/cmapss-isolationforest
         kubectl get pods
         kubectl get svc
