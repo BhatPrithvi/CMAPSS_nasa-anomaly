@@ -68,6 +68,8 @@ jobs :
         kubectl rollout status deployment/cmapss-isolationforest -n nasa-anomaly --timeout=180s #Wait for pods to be ready
         kubectl get pods -n nasa-anomaly
         kubectl get svc -n nasa-anomaly
+        kubectl get endpoints cmapss-isolationforest -n nasa-anomaly
+
 
     - name: Smoke test via ClusterIP + curl pod
       run: |
