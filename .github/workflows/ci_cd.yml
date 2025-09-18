@@ -70,7 +70,6 @@ jobs :
         kubectl get svc -n nasa-anomaly
         kubectl get endpoints cmapss-isolationforest -n nasa-anomaly
 
-
     - name: Smoke test via ClusterIP + curl pod
       run: |
         # Run a temporary curl pod to test the service
