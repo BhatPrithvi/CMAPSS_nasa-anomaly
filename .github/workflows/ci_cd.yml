@@ -77,4 +77,7 @@ jobs :
         --restart=Never \
         -n nasa-anomaly \
         --image=curlimages/curl \
-        -- curl -s http://cmapss-isolationforest:8000/ || exit 1
+        -- /bin/sh -c 'for i in $(seq 1 10); do
+                       curl -s http://cmapss-isolationforest:8000/ && exit 0 || sleep 3
+                     done
+                     exit 1'
