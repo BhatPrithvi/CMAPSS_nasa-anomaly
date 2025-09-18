@@ -59,6 +59,9 @@ jobs :
     - name : Load Docker image into Kind
       run : kind load docker-image nasa-anomaly:latest --name nasa-anomaly
 
+    - name: Create namespace
+      run: kubectl create namespace nasa-anomaly --dry-run=client -o yaml | kubectl apply -f -
+
     - name : Deploy Flask app
       run : |
         kubectl apply -n nasa-anomaly -f k8s/manifests/deployment.yaml
