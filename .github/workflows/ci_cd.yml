@@ -72,6 +72,6 @@ jobs :
     - name : Smoke test via ClusterIP + curl pod 
       run : |
         # Run a temporary curl pod to test service
-        kubectl run curl-test --rm -i --restart= Never \
+        kubectl run curl-test --rm -i --restart= Never -n nasa-anomaly\
         --image=curlimages/curl \
         -- curl -s http://CmapssClusterIP-service :8000/ || exit 1
