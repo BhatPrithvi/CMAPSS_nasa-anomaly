@@ -1,11 +1,8 @@
-NASA Anomaly detection - Dockerized ML Project
+# CI/CD with GitHub Actions for NASA Anomaly Detection
 
-Overview
-This project implements anomaly detection on NASA turbofan engine degradation simulation data using Isolation Forest algorithm. This algorithm was chosen as it is good for high dimenional data without the assumption of normal distribution and is unsupervised The pipeline is containerized with Docker.
+This project demonstrates how to take a machine learning model, package it into a Flask web service, and then fully automate its build, test, and deployment using **GitHub Actions CI/CD pipelines**. 
 
-The model is trained with data and the plots to show anomalies prediction results on test and train data written into CSV output files are saved inside the container. 
-
-
+## Keywords : Kubernetes services, GitHub runner environments, security tokens, `act`
 
 Project Structure
 nasa-anomaly/
@@ -16,7 +13,12 @@ nasa-anomaly/
 |----requirements.txt
 |----test_FD001.txt
 |----train_FD001.txt
-|----ouptut/
+|----.github/workflows/
+    |----ci_cd.yml    
+|----k8s/manifests/
+    |----deployment.yml
+    |----service.yml
+|----output/
     |----TestAnomalyResults
     |----TrainAnomalyResults
     |----plot/
@@ -36,7 +38,16 @@ nasa-anomaly/
 * DataReadme
     Information on training and test data
 
-*ouptut
+* ci_cd.yml
+    Workflow for Github actions
+
+* Deployment.yml
+    Manages replicas, restart policy
+
+* Service.yml
+    Defines a ClusterIP Service that exposes the Flask API within the Kubernetes cluster
+
+* output
     *TestAnomalyResults
         Anomalies predicted in test data
     *TrainAnomalyResults
@@ -47,58 +58,152 @@ nasa-anomaly/
 * CMAPSS_IsolationForest.py
     ML script to train the model and classify the data points
 
+---
 
-PROJECT WORKFLOW
+## Understanding CI/CD
 
-* Needs the folder 
-    nasa-anomaly/
-        |----CMAPSS_IsolationForest.py
-        |----DataReadme.txt
-        |----Dockerfile 
-        |----README
-        |----requirements.txt
-        |----test_FD001.txt
-        |----train_FD001.txt
+* **Continuous Integration (CI)** Continuous Integration (CI) is the practice of automatically building and testing code every time a change is pushed to the repository. The main goal is to catch errors early, make sure new changes don’t break existing functionality, and keep the codebase in a deployable state at all times.
 
-* Prepare environment
-    WSL environment enabled
-    Docker is installed and running
+In this project, the CI stage is handled entirely by GitHub Actions:
+Whenever code is pushed to the repository or a pull request is opened, the workflow is triggered.The runner builds the Docker image for the application. Basic validation is performed, for example, ensuring dependencies install and the app starts correctly. 
+The image is made ready for the next stage — deployment.
 
-*Steps to follow
-    1. Copy folder to own system
-    2. Open terminal in the project folder
-        cd ~/DockerPractice/nasa-anomaly
-    3. Build Docker image
-        * Docker Image Build            
-            docker build -t nasa-anomaly . # Docker reads the Dockerfile. Creates working directory inside the container, copies the requirements first, installs the dependencies and then copies rest of the files from host to container. Sequence written in the Dockerfile
-            mkdir output # create output to store logs and results
-            docker run -rm -v $(pwd)/output: /app/output nasa-anomaly  #--rm Removes container after exit
-                #-v use volume mounts to get outputs on host 
-                # $(pwd)/output:/app/output  maps host folder to container folder
-            docker ps -a # verify container execution
+Automating these steps ensures that manually rebuilding or re-testing after every small code change is not needed. Instead, GitHub Actions acts as a guardrail, providing immediate feedback.
+CI continuously verifies that the application can run in a realistic environment.
+Using Docker inside CI means the image built in the pipeline is the same one that will later run in Kubernetes, reducing “it works on my machine” problems. Once Continuous Integration (CI) is complete and the application is built and tested, the pipeline moves into Continuous Delivery / Deployment (CD).
 
-WORKFLOW
+* **Continuous Delivery/Deployment (CD)** 
 
-    Host Folder (~/DockerPractice/CMAPSS_ML)
-|---- train/
-|----test/
-|---- CMAPSS_IsolationForest.py
-|---- output/  <-- mapped to container
+Continuous Delivery (CDel): ensures that every build is packaged into a release artifact (e.g., Docker image) and is ready to be deployed at any time.
+Continuous Deployment (CDep): takes it one step further — deploying those artifacts automatically into an environment without manual intervention.
+In this project, the CD stage uses GitHub Actions to:
+Build a Docker image of the application.
+Spin up a temporary Kubernetes cluster inside the GitHub Actions runner using Kind.
+Deploy the Docker image to the cluster using Kubernetes manifests.
+Verify the deployment by checking Kubernetes services and running a curl test against the service endpoint.
+This proves that the app can be built, deployed, and reached successfully — all in an automated workflow.
+However, it’s important to note that:
+GitHub runners are temporary. After the job finishes, the cluster is destroyed. Customers cannot access the app from this test environment.
 
-         │  docker build
-         ▼
+Real-world CD pipelines go further:
+The image is pushed to a permanent registry (e.g., GitHub Container Registry, Docker Hub).
+GitHub Actions connects securely to a persistent Kubernetes cluster (e.g., AWS EKS, GCP GKE, Azure AKS, or an on-prem cluster). The manifests are applied there, and the service remains running so customers can access it via an external endpoint.
 
-Container /app
-|---- train/   (copied from host)
-|---- test/    (copied from host)
-|---- CMAPSS_IsolationForest.py
-|---- output/  <-- writes CSV here
+---
 
-         │  docker run with volume
-         ▼
+## Why GitHub Actions
 
-Host Folder ~/DockerPractice/CMAPSS_ML/output/
-|---- TrainAnomalyResults.csv
-|---- TestAnomalyResults.csv
+GitHub Actions is a CI/CD platform built directly into GitHub. Unlike external tools, it does not require hosting or maintaining one's own infrastructure. Instead, workflows run in isolated, temporary environments provided by GitHub, which makes it both convenient and reliable for individuals and teams.
 
-    
+Every time code is pushed or a pull request is opened, GitHub Actions can automatically trigger a workflow — a series of steps defined in YAML files stored under .github/workflows/. These workflows describe the pipeline: for example, build a Docker image, run tests, deploy to Kubernetes, and run a smoke test.
+
+* How It Works
+At the core of GitHub Actions are runners.
+A runner is simply a virtual machine (VM) or container where the workflow steps are executed.
+GitHub provides hosted runners such as ubuntu-latest, windows-latest, and macos-latest. Each job in the workflow gets a fresh, clean runner. Because the environment is ephemeral, there will be no leftovers from a previous run and everything starts from scratch.
+When the workflow begins, the runner:
+Checks out the code (using the actions/checkout action).
+Installs dependencies (for example, pip install -r requirements.txt in a Python project).
+Executes build and test steps.
+Optionally builds artifacts such as Docker images, which can then be deployed.
+
+Requirements and Dependencies
+Since the runners are fresh VMs, all requirements must be declared inside the workflow. Nothing persists between runs. This includes:
+Installing programming language environments
+Installing third-party libraries or dependencies.
+Setting up authentication, such as GitHub Personal Access Tokens (PATs), for pushing images or interacting with private repos.
+Installing cluster tools like kubectl fo deploying to Kubernetes in this case.
+Anyone forking or cloning the repository can reproduce the exact same steps with no hidden local configuration.
+
+GitHub Actions integrates directly with GitHub repositories and needs no extra setup.It provides Linux runners (ubuntu-latest) that already include Docker, making it simple to build images.It has a vast marketplace of community actions (e.g., setup-kubectl, setup-python), reducing the need to write boilerplate scripts.It is free within generous limits, making it cost-effective for personal and open-source work.In short, GitHub Actions reduces friction. Once the code is pushed, it is possible to know if it builds, passes tests, and can be deployed.
+
+---
+
+## Kubernetes Concepts in the Workflow
+
+This workflow uses several fundamental Kubernetes building blocks to deploy and test the Flask application in a reproducible, isolated environment.
+
+* Pod
+The smallest deployable unit in Kubernetes, representing one or more containers. In this project, each pod runs a single container with the Flask application. Pods are ephemeral: if one fails, it is replaced by a controller.
+* Deployment
+A higher-level abstraction that manages pods. It defines how many replicas should be running, ensures pods are rescheduled if they fail, and provides rolling updates for zero-downtime deployments. In this workflow, the Deployment ensures multiple replicas of the Flask app remain available during testing.
+* Service (ClusterIP)
+Pods have dynamic IPs, which makes them unreliable to access directly. A Service provides a stable network endpoint and automatically load-balances traffic across available pods.
+The workflow uses a ClusterIP Service, which exposes the application only inside the cluster.
+For testing, a temporary curl pod is created in the same namespace and reaches the application using in-cluster DNS, e.g.: curl http://cmapss-isolationforest:8000/
+
+* Networking and 0.0.0.0 Binding
+Inside the container, the Flask app listens on 0.0.0.0:8000.
+127.0.0.1 (the default for Flask) restricts access to the container’s localhost only, preventing the Kubernetes Service from reaching the pod. 0.0.0.0 ensures the application is reachable on all network interfaces, allowing the Service to forward traffic successfully.
+* Namespace
+Namespaces provide logical isolation of resources within a cluster. They prevent naming collisions, enable resource quotas, and allow fine-grained access control.In this workflow, resources are deployed to a dedicated namespace nasa-anomaly. This ensures test resources do not interfere with workloads in the default namespace or in other pipelines. If no namespace is specified, Kubernetes automatically places resources into the default namespace, which reduces isolation and increases risk of conflicts.
+
+---
+
+## Port Forwarding vs. In-Cluster Testing
+
+In local development, a common practice is to use kubectl port-forward, which maps a port on the developer’s machine to a port inside the Kubernetes cluster. While convenient for manual debugging, this method is unsuitable for GitHub Actions because workflow runners are ephemeral and lack external network exposure.
+In CI pipelines, a more robust approach is in-cluster testing. After the application is deployed as a Kubernetes Deployment and exposed through a ClusterIP Service, a temporary test pod is launched within the same namespace. This pod, typically running a lightweight image such as curlimages/curl, attempts to reach the service using its in-cluster DNS name (e.g., http://cmapss-isolationforest:8000).
+
+If the curl command succeeds, it confirms that:
+Pods backing the Deployment are running and serving traffic.
+The Service is correctly routing traffic to those pods.
+The in-cluster DNS resolution is functioning as expected.
+This method mirrors production-like communication inside the cluster, eliminates the need for manual port forwarding, and provides an automated, repeatable test that integrates seamlessly into CI/CD pipelines.
+---
+
+## Testing the Workflow Locally with 'act'
+
+'act' is a tool that allows GitHub Actions workflows to be executed locally using Docker. It can be useful for validating workflow syntax and debugging simple steps without repeatedly pushing commits to GitHub.
+However, in the context of Kubernetes-based pipelines, several limitations became apparent:
+Runner environments:
+'act' uses Docker images, while GitHub uses full virtual machines (ubuntu-latest). This means some system tools and permissions differ.
+Kubernetes-in-Docker:
+Creating Kind clusters inside Docker-based runners often fails due to missing privileges. On GitHub’s servers, this worked reliably.
+Secrets management:
+GitHub injects GITHUB_TOKEN automatically into each workflow run. With 'act', tokens had to be provided manually or fall back to SSH keys for authentication during testing.
+As a result, for complex workflows involving Kubernetes, it is often more reliable to execute individual workflow steps (such as docker build, kind create cluster, or kubectl apply) directly in a terminal. This approach provides faster feedback and makes it easier to isolate failing steps.
+* The recommended practice is therefore:
+Use act for quick YAML and logic validation.
+Validate critical steps individually in a local shell.
+Rely on GitHub-hosted runners for the final and authoritative test of the full workflow.
+
+---
+## Tokens and Security in Workflows
+
+Security is central to CI/CD pipelines because credentials are often needed for pushing code, accessing private dependencies, or deploying. In GitHub Actions, authentication is handled in three primary ways:
+
+* GITHUB_TOKEN:
+Automatically generated for every workflow run. It is repository-scoped and short-lived, meaning it expires once the job ends. It is the safest choice for most tasks like cloning the repo, pushing commits, or interacting with GitHub’s API.
+
+* Personal Access Tokens (PATs):
+Manually created by a user and stored as GitHub Secrets. PATs allow broader scopes (e.g., write access to other repos, modifying workflow files). Because they are long-lived, they should be handled carefully and rotated periodically.
+
+* SSH Keys:
+An older but still common method for authentication, especially when interacting with private repositories or when Git operations require non-HTTP access. SSH is less common in GitHub Actions today because GITHUB_TOKEN usually covers the needs.
+
+Here, SSH came into play during local testing with 'act' rather than in GitHub’s hosted runners:
+GitHub’s hosted runners already inject a GITHUB_TOKEN automatically. No extra setup is needed. But when simulating workflows locally with 'act', you don’t automatically get a GITHUB_TOKEN. If the workflow required cloning private repos or pushing commits, the authentication has to be provided manually. Using an SSH key was a straightforward way to make Git operations work inside the local container.
+
+In production GitHub Actions runs (on GitHub’s servers), GITHUB_TOKEN is enough. SSH was only a workaround for local testing where 'act' doesn’t replicate all GitHub internals.
+
+---
+
+## Lessons Learned in This Project
+
+1. **CI/CD separation**: Building Docker images belongs to CI; deploying to Kubernetes belongs to CD. Keeping this separation clear makes workflows easier to understand.
+2. **Token hygiene**: Prefer the built-in `GITHUB_TOKEN`. Use PATs only when workflows need to modify workflows.
+3. **Flask networking**: The app must listen on `0.0.0.0` so Kubernetes Services can forward traffic. Binding only to `127.0.0.1` would break Service connectivity.
+4. **ClusterIP testing**: Testing with a curl pod inside the cluster is more robust than port-forwarding in GitHub runners.
+5. **Namespace management**: Always create a namespace before applying resources; otherwise, deployments fail with “namespace not found.”
+6. **Retries matter**: Services may take time to become available. A retry loop in the curl test increases reliability.
+7. **Dependencies in Docker**: All Python dependencies must be in `requirements.txt`; otherwise, pods will crash with `ModuleNotFoundError`.
+8. **Local vs hosted runners**: `act` is great for local dry-runs but real GitHub runners are necessary for final validation.
+
+---
+
+## Conclusion
+
+Through this project, I not only deployed a machine learning model with Kubernetes, but also gained a deep understanding of how **GitHub Actions orchestrates CI/CD pipelines**. The journey clarified the differences between CI and CD, reinforced secure token practices, and demonstrated the importance of designing pipelines that are both reproducible and cluster-native.
+
+This README is meant to serve both as project documentation and as a learning resource.

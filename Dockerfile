@@ -16,8 +16,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copies everything from current folder on host machine into /app
 COPY . .
 
-# Create output folder inside container to save logs and results
-RUN mkdir -p output
-
 # Default command to run ML script in JSON format. This runs the ML script
 CMD ["python", "CMAPSS_IsolationForest.py"]
