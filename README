@@ -1,184 +1,143 @@
-# NASA Anomaly Detection – Kubernetes Deployment with Kind
 
-This repository demonstrates the deployment of a **anomaly detection system** using **Flask** and **Kubernetes**, with options to run on **Minikube** or **Kind**.
+# Terraform Project – Dockerized ML Application Deployment
 
-While Minikube is a local single-node cluster, this README focuses on **Kind (Kubernetes in Docker)**, which is suitable for CI/CD pipelines, testing multi-node clusters, and development without needing a VM.
+## Overview
 
-For detailed explanations of **Kubernetes concepts**, **Flask API**, and **Minikube deployment**, refer to the README in the `k8s/minikube/` folder.
-
----
-
-## 1. Overview
-
-* **ML Script**: Performs anomaly detection using the NASA CMAPSS dataset and saves results in `/app/output`.
-* **Flask API**: Exposes endpoints:
-
-  * `/` -> Health or simple message
-  * `/metrics` -> CPU and memory stats
-  * `/results` -> Summary of anomaly detection
-  
-* **Kubernetes**: Manages container deployment with:
-
-  * **Pod** -> runs ML + Flask container
-  * **Deployment** -> manages replicas, restart policy
-  * **Service** -> exposes Flask API to host
-  * **PVC / PV** -> mounts container output to host
+This repository demonstrates the use of **Terraform** to provision and manage Docker containers running a machine learning application served through a Flask API. The project establishes a foundation for Infrastructure as Code (IaC) practices, emphasizing reproducibility, automation, and scalable deployment. The focus of this project is on local provisioning using the Docker provider.
 
 ---
 
-## 2. Getting Started with Kind
+## Motivation for Terraform
 
-### 2.1 Prerequisites
+Procedural scripts require explicit step-by-step execution, which can lead to inconsistencies and errors when environments scale. Terraform utilizes a declarative approach, allowing the desired infrastructure state to be defined—such as the number of containers, network configurations, and port mappings—while automatically determining the steps to achieve that state.
 
-* Docker installed and running
-* Kind installed (`kind` CLI)
-* kubectl installed and configured
-
-### 2.2 Deploying with Kind
-
-1. Run deployment script:
-
-   ```bash
-   chmod +x k8s/kind/deploy_kind.sh
-   ./k8s/kind/deploy_kind.sh
-   ```
-
-   This script will:
-
-   * Create a Kind cluster (if not exists)
-   * Load the Docker image into the cluster
-   * Create namespace `nasa-anomaly`
-   * Apply Deployment, Service, and PVC manifests
-   * Wait for pods to be ready
-   * Port-forward the Flask API to `localhost:8000`
-   * Optionally copy ML output from Pod to host
-
-2. Access Flask API:
-
-   ```text
-   http://localhost:8000/
-   http://localhost:8000/metrics
-   http://localhost:8000/results
-   ```
-3. Stopping cluster
-
-    ```bash
-    chmod +x k8s/kind/stop_kind.sh
-   ./k8s/kind/stop_kind.sh
-   ```
+Terraform maintains a state file that tracks all infrastructure changes, ensuring reproducibility across different systems and teams. This model enhances automation, reduces human error, and facilitates the management of complex environments. Consequently, Terraform is a critical tool for modern DevOps workflows where consistency, scalability, and reliability are paramount.
 
 ---
 
-## 3. Switching to Minikube
+## Repository Structure
 
-To use Minikube instead:
+```
+terraform/
+├── main.tf          # Root module configuration
+├── output.tf        # Root-level outputs
+└── modules/
+    └── docker_node/
+        ├── main.tf  # Module-level resource definitions
+        └── output.tf # Module-level outputs
 
-```bash
-chmod +x k8s/kind/deploy_minikube.sh
-./k8s/minikube/deploy_minikube.sh
-
-
-chmod +x k8s/kind/stop_minikube.sh
-./k8s/minikube/stop_minikube.sh
 ```
 
-> Refer to `k8s/minikube/README.md` for full instructions and explanations of Kubernetes concepts with Minikube.
+### Project Structure and File Relationships
+
+Terraform projects are typically organized into two levels: the root module (the entry point where terraform apply is executed) and child modules (reusable building blocks). In this project, Docker containers are provisioned through a docker_node child module.
+
+Root Level (terraform/) :
+The root level is the starting point of execution.
+main.tf (root)
+Declares which modules to use, passes variables, and orchestrates infrastructure.
+output.tf (root)
+Collects and displays information from the child module’s outputs, making it visible after terraform apply.
+
+Module Level (terraform/modules/docker_node/):
+The module level defines the actual resources. It is reusable and can be called multiple times from the root.
+main.tf (module)
+Defines resources such as Docker containers, using variables passed from the root.
+output.tf (module)
+Returns useful details (e.g., container names and ports) back to the root.
+
+Root and Module Communication
+
+The root main.tf calls the module and passes variables. The module main.tf creates the actual resources using those variables. The module output.tf sends results (e.g., container names and ports) back up. The root output.tf prints these results after execution.
 
 ---
+## HashiCorp Configuration Language (HCL)
 
-## 4. Minikube vs Kind
+Terraform configurations are written in HashiCorp Configuration Language (HCL), a declarative language designed specifically for infrastructure as code. HCL is human-readable and allows infrastructure to be described in terms of resources, variables, outputs, and modules, rather than procedural steps.
 
-| Feature / Aspect              | **Minikube**                                                                                            | **Kind**                                                                                                                | Notes / Implications                                                                                                                      |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| **Cluster Type**              | Runs a single-node Kubernetes cluster inside a VM (VirtualBox, HyperKit, Docker, etc.)                  | Runs Kubernetes inside Docker containers on the host                                                                    | Minikube provides a VM-based environment, while Kind is container-based; this affects networking, image handling, and resource isolation. |
-| **Local Image Usage**         | Can use local Docker images if shell points to Minikube’s Docker daemon (`eval $(minikube docker-env)`) | Cannot directly use host Docker images; must load via `kind load docker-image <image>`                                  | Kind nodes are isolated Docker containers; images must be explicitly loaded.                                                              |
-| **Networking**                | VM-based, with minikube-provided IP; port-forwarding less strict                                        | Docker container network; port-forwarding maps host ports into containerized nodes                                      | Minikube may be more forgiving with container startup and ML scripts; Kind requires the container to stay alive for readiness checks.     |
-| **Pod Lifecycle / Readiness** | Slightly more forgiving for containers that exit or block; ML scripts outside Flask may work            | Strict: container must stay alive and pass readiness/liveness checks; top-level blocking or exiting containers may fail | ML scripts should run inside Flask or another long-running process when using Kind.                                                       |
-| **Performance / Resources**   | VM-based; can allocate memory and CPUs to VM                                                            | Uses host Docker resources; lightweight but shares host Docker limits                                                   | Kind is faster to start, no VM overhead; Minikube can be slower due to VM boot time.                                                      |
-| **Multi-Node Support**        | Can simulate multi-node clusters, but mostly single-node for local dev                                  | Can create multi-node clusters by specifying multiple Docker containers                                                 | Kind excels at testing multi-node scenarios locally without VMs.                                                                          |
-| **Port Forwarding**           | `minikube service <service-name>` opens service in browser automatically                                | Use `kubectl port-forward` or NodePort; no automatic browser launch                                                     | Port mapping differs; Minikube has helper commands to simplify access.                                                                    |
-| **Persistence / Volumes**     | Supports hostPath and VM-mounted storage; PVCs work normally                                            | Supports PVCs; uses Docker volumes for persistent storage                                                               | Functionality similar, but underlying storage is different.                                                                               |
-| **Setup / Learning Curve**    | Simple to get started, especially for beginners                                                         | Lightweight, faster, good for CI pipelines                                                                              | Kind is ideal for CI/CD pipelines, automated tests, and GitHub Actions.                                                                   |
-| **Use Case Recommendations**  | Local development, learning Kubernetes, quick ML API testing                                            | CI/CD pipelines, automated testing, multi-node cluster simulation                                                       | Minikube is more “user-friendly” for step-by-step exploration; Kind is more scriptable and CI-friendly.                                   |
+Using HCL, users define the desired state of their infrastructure—for example, the number of Docker containers, network settings, and port mappings—and Terraform determines the steps required to achieve that state. This approach enables reproducibility, reduces the likelihood of human error, and simplifies automation across environments.
 
+--- 
+## Setup and Usage
 
-#### ML Script Must Be Inside Flask for Kind
+### Prerequisites
 
-ML Script Outside Flask (Top-Level Execution):
+* Docker installed and running locally
+* Terraform installed and available on the command line
 
-Container runs ML code immediately at startup. In Minikube, the VM networking allows ML to complete without failing pod readiness. 
-In Kind, which runs pods inside Docker network on the host:
-Top-level ML may finish too quickly -> container exits before Kubernetes marks it ready.
-Top-level ML may block -> Kubernetes health checks fail.
-Result: Pod may crash, restart, or never become ready.
-
-ML Script Encapsulated in Flask:
-
-ML logic wrapped inside a function, invoked by Flask at container startup.
-Flask’s WSGI server keeps the container running indefinitely.
-Kubernetes sees container as healthy → Service / NodePort works → endpoints accessible from host.
-
-
-> In this repo, **Kind is the recommended option** for a quick, reproducible, and GitHub-friendly deployment.
-
----
-
-## 5. Common Errors & Debugging
-
-| Symptom               | Possible Cause                               | Debug Command / Fix                                                         |
-| --------------------- | -------------------------------------------- | --------------------------------------------------------------------------- |
-| `CrashLoopBackOff`    | Script error inside container or wrong image | `kubectl logs <pod-name> -n nasa-anomaly`                                   |
-| `ErrImagePull`        | Image not loaded into Kind                   | `kind load docker-image nasa-anomaly:latest --name nasa-anomaly`            |
-| `Port not accessible` | Port-forward not running                     | `kubectl port-forward svc/cmapss-isolationforest 8000:8000 -n nasa-anomaly` |
-| Namespace not deleted | Pods stuck in Terminating                    | `kubectl delete pod <pod-name> --grace-period=0 --force`                    |
-| Cannot copy output    | Folder permission or pod not ready           | `kubectl cp <pod>:/app/output ./output`                                     |
-
----
-
-## 6. Basic Kind & kubectl Commands
+### Build the ML Application Docker Image
 
 ```bash
-# List Kind clusters
-kind get clusters
-
-# Delete Kind cluster
-kind delete cluster --name nasa-anomaly
-
-# Check pods
-kubectl get pods -n nasa-anomaly
-
-# Check services
-kubectl get svc -n nasa-anomaly
-
-# Get pod logs
-kubectl logs <pod-name> -n nasa-anomaly
-
-# Port forward
-kubectl port-forward svc/cmapss-isolationforest 8000:8000 -n nasa-anomaly
-
-# Describe resource
-kubectl describe pod <pod-name> -n nasa-anomaly
-
-# Copy files from pod to host
-kubectl cp <namespace>/<pod>:/app/output ./output
+docker build -t nasa-anomaly:latest .
 ```
+
+This image contains the Flask-based ML application and required dependencies.
+
+### Initialize Terraform
+
+```bash
+terraform init
+```
+
+This command sets up the working directory, downloads required providers, and prepares Terraform for execution.
+
+### Review the Plan
+
+```bash
+terraform plan
+```
+
+The plan describes the resources that Terraform will create, update, or destroy.
+
+### Apply Infrastructure
+
+```bash
+terraform apply -auto-approve
+```
+
+Terraform provisions the defined resources, including Docker containers with mapped ports and volumes.
+
+### Destroy Infrastructure
+
+```bash
+terraform destroy -auto-approve
+```
+
+This command removes all resources provisioned by Terraform, returning the system to its prior state.
 
 ---
 
-## 7. Notes
+## Outputs
 
-* The ML script runs **once at container startup**, and Flask serves the results via API.
-* With Kind, **local Docker images** are preferred over pulling from Docker Hub.
-* For multi-node or CI/CD simulations, Kind supports multiple nodes.
-* For deeper understanding of **Flask API endpoints, volume mounts, and Kubernetes internals**, see `minikube/README.md`.
+After applying the configuration, Terraform exposes outputs such as container names and mapped host ports. Example:
 
+```hcl
+nodes = {
+  "node-1" = { app_port = 8001 }
+  "node-2" = { app_port = 8002 }
+}
+```
 
-### Contribution:
-Refactored ML code to run inside Flask for long-running container. 
-Designed container to persist outputs, expose endpoints, and run in Kubernetes.
-Created scripts for automated deployment (deploy_kind.sh, stop_kind.sh) and orchestration.
-Template Use:
-Kubernetes YAML templates (Deployment, Service, PVC) were adapted for this project.
-Helper scripts handle cluster setup and image loading.
-Focus is on demonstrating Kubernetes orchestration of an ML API with Kind as primary deployment target.
+These outputs can be utilized for configuration management, monitoring, or integration with further automation tools such as Ansible.
 
+---
+
+## Quality Assurance
+Although this project does not yet include automated quality checks, Terraform supports several built-in and external tools that are typically part of professional DevOps workflows. These can be integrated into a CI/CD pipeline to improve reliability:
+
+terraform fmt
+Automatically formats configuration files into a canonical style, ensuring that all code follows consistent indentation and layout.
+
+terraform validate
+Performs a basic syntax and internal consistency check of configuration files before execution, helping to catch errors early.
+
+tflint
+A linter that performs static analysis of Terraform code, checking for best practices, unused declarations, and potential security risks.
+
+These checks are not yet applied in this repository, but they represent the next step toward making the infrastructure code more maintainable and production-ready.
+
+---
+
+## Summary
+
+This project demonstrates local infrastructure provisioning with Terraform, emphasizing declarative configuration, reproducibility, and automation. It establishes a foundation for progressively more complex DevOps workflows, enabling seamless transition from local development environments to scalable, cloud-based infrastructure deployments.

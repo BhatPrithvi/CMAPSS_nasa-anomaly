@@ -9,3 +9,14 @@ ml-output/
 # .pyc ignores all python compiled files
 # Thumbs.db - created by Windows and stored thumbnail cache for images/videos in a folder 
 # Ignore output folder
+
+
+# Terraform
+*.tfstate
+*.tfstate.backup
+.terraform/
+crash.log
+override.tf
+override.tf.json
+*.tfvars
+*.tfvars.json
