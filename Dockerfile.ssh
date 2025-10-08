@@ -1,0 +1,15 @@
+FROM rastasheep/ubuntu-sshd:18.04
+
+# Add Ansible user
+RUN useradd -m ansible && echo "ansible:ansible" | chpasswd
+
+# Install SSH server and curl
+RUN apt-get update && \
+    apt-get install -y openssh-server curl && \
+    mkdir -p /var/run/sshd
+
+# Expose SSH port
+EXPOSE 22
+
+# Start SSH server (already handled in base image)
+CMD ["/usr/sbin/sshd","-D"]

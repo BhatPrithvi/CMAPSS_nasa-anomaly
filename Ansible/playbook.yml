@@ -1,0 +1,33 @@
+- hosts: ml_nodes        # Target group of hosts defined in the inventory file
+  become: false          # Do not escalate privileges to root; run as normal user
+
+  tasks:                 # List of tasks to execute on the hosts
+
+    # Task 1: Ping node-1 
+    - name: Ping node-1
+      ping:              # The 'ping' module simply checks Ansible connectivity via SSH
+      delegate_to: node-1   # Run this task specifically on node-1
+
+    # Task 2: Ping node-2 
+    - name: Ping node-2
+      ping:
+      delegate_to: node-2   # Run this task specifically on node-2
+
+    - name: Ping all ML nodes
+      ping:                 # Bulk node check
+
+    - name: Fetch metrics from ML container on node-1
+      shell: curl -s http://host.docker.internal:8001/metrics
+      register: metrics_node1
+
+    - name: Display metrics from node-1
+      debug:
+        var: metrics_node1.stdout
+
+    - name: Fetch metrics from ML container on node-2
+      shell: curl -s http://host.docker.internal:8002/metrics
+      register: metrics_node2
+
+    - name: Display metrics from node-2
+      debug:
+        var: metrics_node2.stdout

@@ -1,143 +1,193 @@
 
-# Terraform Project – Dockerized ML Application Deployment
+# ML Container with SSH Sidecar, Terraform, and Ansible 
 
-## Overview
+This project demonstrates deploying a machine learning application and accessing its internal metrics from outside using an SSH sidecar container. It combines Terraform for resource creation, Docker for containerization, and Ansible for orchestration and configuration. The project is structured to understand the interaction between infrastructure provisioning, configuration management, and cross-container networking.
 
-This repository demonstrates the use of **Terraform** to provision and manage Docker containers running a machine learning application served through a Flask API. The project establishes a foundation for Infrastructure as Code (IaC) practices, emphasizing reproducibility, automation, and scalable deployment. The focus of this project is on local provisioning using the Docker provider.
+Project Structure
+nasa-anomaly/
+|----CMAPSS_IsolationForest.py
+|----DataReadme.txt
+|----Dockerfile.ml_app
+|----Dockerfile.ssh
+|----README
+|----requirements.txt
+|----test_FD001.txt
+|----train_FD001.txt
+|----scripts
+  |----tf2inventory.sh
+|----Ansible
+  |----inventories
+    |----dev.ini
+  |----playbook.yml
+|----terraform
+  |----main.tf
+  |----output.tf
+
+
+* CMAPSS_IsolationForest.py
+    ML script to train the model and classify the data points       
+* requirements.txt 
+    list all dependencies in PyPI version only
+* train_FD001.txt   
+    Holds the training data
+* test_FD001.txt
+    Hold the test data
+* DataReadme
+    Information on training and test data
+* terraform/main.tf 
+    Defines Docker containers and port mappings
+* terraform/output.tf
+    Specifies outputs, including SSH ports, for use in Ansible inventory generation.
+* scripts/tf2inventory.sh 
+    Bash script that transforms Terraform output into `ansible/inventories/dev.ini`.
+* ansible/playbook.yml
+    Ansible playbook that connects to SSH sidecars and fetches metrics from ML apps.
+* ansible/inventories/dev.ini
+    Auto-generated inventory file defining the nodes for Ansible.
+* Dockerfile.ml_app
+    Builds the ML container with the Flask app exposing metrics.
+* Dockerfile.ssh 
+    Builds the SSH sidecar container with SSH server and curl installed.
+
+
+---
+## Workflow ##
+
+* Ensure Docker Desktop is running on the host machine
+* Build the ML application Docker image:
+    `docker build -t nasa-anomaly -f Dockerfile.ml_app .`
+* Build the SSH sidecar Docker image:
+    `docker build -t nasa-anomaly-ssh -f Dockerfile.ssh .`
+* Initialize and apply Terraform inside the terraform/ directory:
+    `terraform init`
+    `terraform apply`
+    This provisions the Docker containers for each ML node and SSH sidecar as defined in main.tf and output.tf.
+* Generate the Ansible inventory using the Bash script:
+    `bash scripts/tf2inventory.sh`
+    This produces Ansible/inventories/dev.ini with host, port, and user details for each node.
+* Run the Ansible playbook to connect to the SSH sidecar containers and fetch ML metrics:
+    `ansible-playbook -i Ansible/inventories/dev.ini Ansible/playbook.yml`
+    This ensures connectivity to each node and retrieves the metrics from the ML containers via the SSH sidecars.
+
+## 1. The Role of Terraform
+
+Terraform is an **infrastructure as code (IaC)** tool that declaratively defines and provisions resources. In a cloud environment, it typically allocates VMs, networks, and storage. In this project, Terraform is used locally to **create Docker containers** that act as nodes in this small cluster. While Terraform itself does not configure applications inside the containers, it ensures that the containers exist, are networked correctly, and expose the right ports. Once the containers are running, Ansible takes over to configure them and run commands inside.
+
+Terraform achieves this with the **Docker provider**, which allows `docker_container` resources to be defined in `main.tf`. These container resources specify which image to use (`Dockerfile.ml_app` and `Dockerfile.ssh`), how ports are mapped to the host, and what environment is needed. Thus, Terraform is not running the containers directly via `docker run`, but is declaratively managing them as infrastructure resources.
 
 ---
 
-## Motivation for Terraform
+## 2. Ansible and SSH
 
-Procedural scripts require explicit step-by-step execution, which can lead to inconsistencies and errors when environments scale. Terraform utilizes a declarative approach, allowing the desired infrastructure state to be defined—such as the number of containers, network configurations, and port mappings—while automatically determining the steps to achieve that state.
+Ansible is a **configuration management and orchestration tool**. Unlike Terraform, it does not provision resources. Instead, it connects to already running hosts and performs tasks such as installing packages, copying files, and executing commands.
 
-Terraform maintains a state file that tracks all infrastructure changes, ensuring reproducibility across different systems and teams. This model enhances automation, reduces human error, and facilitates the management of complex environments. Consequently, Terraform is a critical tool for modern DevOps workflows where consistency, scalability, and reliability are paramount.
+Ansible connects to remote machines via **SSH (Secure Shell)** by default. SSH is a protocol that provides encrypted communication and remote command execution. Every Ansible task — whether installing `curl` or fetching metrics — is executed by issuing commands over SSH. This is why SSH sidecar container exists: it exposes an SSH server that allows Ansible to connect to the node using credentials defined in the inventory.
 
----
-
-## Repository Structure
-
-```
-terraform/
-├── main.tf          # Root module configuration
-├── output.tf        # Root-level outputs
-└── modules/
-    └── docker_node/
-        ├── main.tf  # Module-level resource definitions
-        └── output.tf # Module-level outputs
-
-```
-
-### Project Structure and File Relationships
-
-Terraform projects are typically organized into two levels: the root module (the entry point where terraform apply is executed) and child modules (reusable building blocks). In this project, Docker containers are provisioned through a docker_node child module.
-
-Root Level (terraform/) :
-The root level is the starting point of execution.
-main.tf (root)
-Declares which modules to use, passes variables, and orchestrates infrastructure.
-output.tf (root)
-Collects and displays information from the child module’s outputs, making it visible after terraform apply.
-
-Module Level (terraform/modules/docker_node/):
-The module level defines the actual resources. It is reusable and can be called multiple times from the root.
-main.tf (module)
-Defines resources such as Docker containers, using variables passed from the root.
-output.tf (module)
-Returns useful details (e.g., container names and ports) back to the root.
-
-Root and Module Communication
-
-The root main.tf calls the module and passes variables. The module main.tf creates the actual resources using those variables. The module output.tf sends results (e.g., container names and ports) back up. The root output.tf prints these results after execution.
-
----
-## HashiCorp Configuration Language (HCL)
-
-Terraform configurations are written in HashiCorp Configuration Language (HCL), a declarative language designed specifically for infrastructure as code. HCL is human-readable and allows infrastructure to be described in terms of resources, variables, outputs, and modules, rather than procedural steps.
-
-Using HCL, users define the desired state of their infrastructure—for example, the number of Docker containers, network settings, and port mappings—and Terraform determines the steps required to achieve that state. This approach enables reproducibility, reduces the likelihood of human error, and simplifies automation across environments.
-
---- 
-## Setup and Usage
-
-### Prerequisites
-
-* Docker installed and running locally
-* Terraform installed and available on the command line
-
-### Build the ML Application Docker Image
-
-```bash
-docker build -t nasa-anomaly:latest .
-```
-
-This image contains the Flask-based ML application and required dependencies.
-
-### Initialize Terraform
-
-```bash
-terraform init
-```
-
-This command sets up the working directory, downloads required providers, and prepares Terraform for execution.
-
-### Review the Plan
-
-```bash
-terraform plan
-```
-
-The plan describes the resources that Terraform will create, update, or destroy.
-
-### Apply Infrastructure
-
-```bash
-terraform apply -auto-approve
-```
-
-Terraform provisions the defined resources, including Docker containers with mapped ports and volumes.
-
-### Destroy Infrastructure
-
-```bash
-terraform destroy -auto-approve
-```
-
-This command removes all resources provisioned by Terraform, returning the system to its prior state.
+HTTP, by contrast, is an application-layer protocol used to expose services such as web APIs. In this project, the ML application exposes its metrics on an HTTP endpoint (`/metrics`). While Ansible itself communicates over SSH, the services to be tested and monitored often use HTTP.
 
 ---
 
-## Outputs
+## 3. Why Two Containers?
 
-After applying the configuration, Terraform exposes outputs such as container names and mapped host ports. Example:
+The project uses **two different containers per node**:
 
-```hcl
-nodes = {
-  "node-1" = { app_port = 8001 }
-  "node-2" = { app_port = 8002 }
-}
+1. **ML container** – Runs the ML application and exposes metrics on port `8000`. This is a Flask app with an HTTP endpoint. It does not have SSH installed to keep the ML runtime lightweight and dedicated to its application.
+
+2. **SSH sidecar container** – Runs an SSH server (based on the `rastasheep/ubuntu-sshd` base image) and `curl`. This container is used by Ansible to connect via SSH and perform checks. It also has access to the host networking and can call into the ML container’s port mapping (`host.docker.internal:8001`, `host.docker.internal:8002`, etc.).
+
+This separation follows the **sidecar pattern**: one container focuses on the business logic (ML app), while another container provides management or monitoring utilities (SSH, curl).
+
+---
+
+## 4. Base Images and Curl
+
+The SSH container is based on `rastasheep/ubuntu-sshd`, which is a minimal Ubuntu image with an OpenSSH server preinstalled and configured. This saves setup time compared to starting from scratch with a raw Ubuntu base image.
+
+`curl` is installed explicitly inside the SSH container. This is essential because `curl` allows fetching metrics over HTTP. Without it, Ansible tasks that run `curl http://.../metrics` would fail with `/bin/sh: curl: not found`. Installing `curl` in the SSH sidecar ensures that monitoring tasks can query the ML app’s HTTP interface.
+
+---
+
+## 5. Networking and Ports
+
+A recurring point of confusion in containerized workflows is how one container can reach services running in another. In this project, there are two types of containers:
+The ML container, which exposes its metrics on port 8000.
+The SSH sidecar container, which is used by Ansible for configuration and remote execution over SSH.
+
+When the ML container is started with Docker, its internal port 8000 is mapped to a host port such as 8001. This means that from the host machine, the service is accessible at 127.0.0.1:8001. For example, a browser on the host can directly fetch metrics from http://127.0.0.1:8001/metrics.
+
+However, Ansible does not run curl directly on the host. Instead, it connects via SSH into the sidecar container and executes the command inside that container. From the sidecar’s perspective, 127.0.0.1 refers only to its own loopback network interface, not to the host machine or to the ML container. This is why commands like curl http://127.0.0.1:8001/metrics fail inside the sidecar.
+
+To solve this, Docker provides the special DNS name host.docker.internal. Inside any container, this name resolves to the host machine’s internal IP address. Since the ML container’s port 8000 has been mapped to the host’s port 8001, the sidecar container can access it by calling:
+
+curl http://host.docker.internal:8001/metrics
+
+When a container uses host.docker.internal:<port>, it is essentially saying: “Hey host, please forward my request to whatever container/service is listening on this host port.”
+The host acts as a middleman. It receives the request on the mapped port (e.g., 8001, 8002) and routes it to the correct container’s internal port (8000 inside the ML container). The container using host.docker.internal does not need to know the internal IP of the target container—it only needs the host’s special DNS name and the mapped port.
+
+The traffic flow is therefore as follows:
+The ML container serves metrics on port 8000. Docker maps this port to 8001 on the host.The SSH sidecar, running the curl command, uses host.docker.internal:8001 to reach the host.The host forwards the request back into the ML container, where the metrics are served.
+This explains why 127.0.0.1:8001 works from the host itself (e.g., in a browser) but fails from inside the SSH sidecar container, while host.docker.internal:8001 works reliably in the sidecar
+
+---
+
+## 6. Nodes and Inventory Generation
+
+Two nodes are provisioned instead of one to better reflect a distributed environment. While a single node could run both the ML application and its SSH service, separating the workload into two nodes demonstrates how orchestration, scaling, and resource isolation are managed across multiple machines. Each node is represented by one ML container and one SSH sidecar, so two nodes result in two such pairs. This design allows the workflow to showcase multi-node orchestration in a way that closely resembles production deployments.
+
+The nodes are logical groupings — each node represents one ML service + its SSH gateway.
+Node-1:
+ML container (Flask app, exposed on host 127.0.0.1:8001)
+SSH sidecar (exposed on host 127.0.0.1:2220)
+
+Node-2:
+ML container (Flask app, exposed on host 127.0.0.1:8002)
+SSH sidecar (exposed on host 127.0.0.1:2221)
+
+Terraform defines resources in `terraform/main.tf` and outputs a JSON map of nodes with their SSH ports. The `output.tf` file defines which values (such as `ssh_port`) should be made available to the outside world.
+
+The Bash script `scripts/tf2inventory.sh` converts Terraform’s JSON output into an Ansible inventory file. It uses `jq` to parse the JSON and generate INI-style entries. The resulting `ansible/inventories/dev.ini` file defines the `[ml_nodes]` group with host entries like:
+
+```
+[ml_nodes]
+node-1 ansible_host=127.0.0.1 ansible_port=2220 ansible_user=ansible ansible_password=ansible ansible_connection=ssh
+node-2 ansible_host=127.0.0.1 ansible_port=2221 ansible_user=ansible ansible_password=ansible ansible_connection=ssh
 ```
 
-These outputs can be utilized for configuration management, monitoring, or integration with further automation tools such as Ansible.
+This file allows Ansible to know exactly how to connect to each node. Unlike a static inventory, this one is dynamically generated based on the Terraform deployment, ensuring consistency between infrastructure and configuration.
 
 ---
 
-## Quality Assurance
-Although this project does not yet include automated quality checks, Terraform supports several built-in and external tools that are typically part of professional DevOps workflows. These can be integrated into a CI/CD pipeline to improve reliability:
+## 7. Ansible Playbook
 
-terraform fmt
-Automatically formats configuration files into a canonical style, ensuring that all code follows consistent indentation and layout.
+The Ansible playbook (`playbook.yml`) includes tasks to fetch metrics from each ML node. For example:
 
-terraform validate
-Performs a basic syntax and internal consistency check of configuration files before execution, helping to catch errors early.
+```yaml
+- name: Fetch metrics from ML container on node-2
+  shell: curl -s http://host.docker.internal:8002/metrics
+  register: metrics_node2
 
-tflint
-A linter that performs static analysis of Terraform code, checking for best practices, unused declarations, and potential security risks.
+- name: Display metrics from node-2
+  debug:
+    var: metrics_node2.stdout
+```
 
-These checks are not yet applied in this repository, but they represent the next step toward making the infrastructure code more maintainable and production-ready.
+Attempts to fetch metrics via `127.0.0.1:8000` or the container hostname failed because the SSH sidecar’s localhost is not the ML container, and there is no shared network alias. The reliable method is to use `host.docker.internal`, which resolves the host’s mapped ports and provides a stable connection across containers.
 
 ---
 
-## Summary
+## 8. Error Handling and Debugging
 
-This project demonstrates local infrastructure provisioning with Terraform, emphasizing declarative configuration, reproducibility, and automation. It establishes a foundation for progressively more complex DevOps workflows, enabling seamless transition from local development environments to scalable, cloud-based infrastructure deployments.
+Common errors encountered during setup include:
+
+* **Port already allocated** – Occurs when restarting containers without cleaning up. Solution: stop or remove the previous containers before starting new ones.
+* **curl: not found** – Indicates that the SSH sidecar did not have curl installed. Solution: install `curl` in the Dockerfile.
+* **Connection refused** – Happens when referencing `127.0.0.1:8000` inside the SSH container. The fix is to use `host.docker.internal` instead.
+
+Each of these errors reflects the distinction between host and container networking, and between configuration and provisioning responsibilities.
+
+---
+
+## 10. Summary
+
+The project demonstrates a complete flow: Terraform provisions containers, Ansible configures and tests them, and Docker networking allows interaction between ML apps and SSH sidecars. The combination of SSH for management and HTTP for metrics exposes the separation between infrastructure, configuration, and application layers. The use of `host.docker.internal` illustrates how containers can communicate with host-exposed ports, solving the problem of accessing one container’s service from another. In practice, this setup mirrors how real-world clusters separate business logic containers from sidecars that provide logging, monitoring, or access control. 
+

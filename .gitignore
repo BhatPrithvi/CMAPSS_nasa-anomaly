@@ -12,11 +12,25 @@ ml-output/
 
 
 # Terraform
-*.tfstate
-*.tfstate.backup
-.terraform/
-crash.log
+# Local .terraform directories
+terraform/.terraform/
+# Terraform state files
+terraform/*.tfstate
+terraform/*.tfstate.backup
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+# Crash logs and override files
+*.tfvars
 override.tf
 override.tf.json
-*.tfvars
-*.tfvars.json
+*_override.tf
+*_override.tf.json
+.terraform.lock.hcl
+crash.log
+# Crash logs
+crash.log
+
+# CLI configuration files
+.terraformrc
+terraform.rc
+

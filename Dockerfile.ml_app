@@ -19,5 +19,9 @@ COPY . .
 # Create output folder inside container to save logs and results
 RUN mkdir -p output
 
-# Default command to run ML script in JSON format. This runs the ML script
+# Expose Flask port (8000)
+EXPOSE 8000
+
+# Start SSH service and then ML script
+# Use a simple shell to run multiple commands
 CMD ["python", "CMAPSS_IsolationForest.py"]
